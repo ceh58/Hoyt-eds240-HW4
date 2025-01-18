@@ -1,0 +1,86 @@
+---
+title: "US Emissions"
+author: "Carmen Hoyt"
+date: last-modified
+format:
+  html:
+      toc: true
+      code-fold: true
+editor: visual
+execute:
+  warning: false
+  messages: false
+editor_options: 
+  chunk_output_type: console
+---
+
+# About
+
+# Data
+
+Load packages
+```{r}
+#| code-summary: Expand code
+#| messages: false
+library(here)
+library(janitor)
+library(readxl)
+library(tidyverse)
+```
+
+Load data
+```{r}
+filenames <- list.files(here("data"), pattern= ".xlsx", full.names=TRUE)
+
+datalist = vector("list", length = length(filenames))
+
+for (i in seq_along(filenames)) {
+  table <- read_excel(filenames[i]) %>%
+  clean_names()
+  datalist[[i]] <- table
+}
+
+emissions_raw = do.call(rbind, datalist)
+```
+
+```{r}
+#| code-summary: Expand code
+# Clean data
+emissions_cleaned <- emissions_raw %>%
+  
+  # Remove duplicate rows
+  distinct() %>%
+  
+  # Remove Puerto Rico and Virgin Islands
+  filter(!state %in% c("Puerto Rico", "Virgin Islands")) %>%
+  
+  # Arrange alphabetically by state name
+  arrange(state)
+```
+
+# Data exploration
+```{r}
+emissions_cleaned %>%
+  group_by(state) %>%
+  summarize(total_emissions = sum(emissions_tons)) %>%
+  top_n(5, total_emissions) %>%
+  ggplot(aes(state, total_emissions)) +
+  geom_col()
+
+emissions_cleaned %>%
+  filter(pollutant_type == "GHG") %>%
+  group_by(pollutant) %>%
+  summarize(total_emissions = sum(emissions_tons)) %>%
+  ggplot(aes(pollutant, total_emissions)) +
+  geom_col()
+
+emissions_cleaned %>%
+  filter(pollutant == "Carbon Dioxide") %>%
+  group_by(scc_level_2) %>%
+  summarize(total_emissions_co2 = sum(emissions_tons)) %>%
+  top_n(5, total_emissions_co2) %>%
+  ggplot(aes(scc_level_2, total_emissions_co2)) +
+  geom_col() +
+  coord_flip()
+```
+
