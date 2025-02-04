@@ -1,0 +1,364 @@
+---
+title: "Exploration"
+author: "Carmen Hoyt"
+date: last-modified
+format:
+  html:
+      toc: true
+      code-fold: true
+      embed-resources: true
+editor: visual
+execute:
+  warning: false
+  messages: false
+editor_options: 
+  chunk_output_type: console
+---
+# Part 2
+
+Load packages
+```{r}
+#| code-summary: Expand code
+#| messages: false
+library(here)
+library(janitor)
+library(readxl)
+library(tidyverse)
+library(geofacet) 
+```
+
+# Clean and wrangle data
+
+Load data
+```{r}
+#| code-summary: Expand code
+# turn off scientific notation
+options(scipen=999)
+
+# read in filenames
+filenames <- list.files(here("data"), pattern= ".xlsx", full.names=TRUE)
+
+# create an empty list to store imported dataframes
+datalist = vector("list", length = length(filenames))
+
+# import dataframes
+for (i in seq_along(filenames)) {
+  table <- read_excel(filenames[i]) %>%
+  clean_names()
+  datalist[[i]] <- table
+}
+
+# bind all dataframes in list
+emissions_raw = do.call(rbind, datalist)
+
+#emissions_raw <- read_csv(here("data", "emissions_raw.csv"))
+```
+
+Clean data
+```{r}
+#| code-summary: Expand code
+# Clean data
+emissions_cleaned <- emissions_raw %>%
+  
+  # Remove duplicate rows
+  distinct() %>%
+  
+  # Remove Puerto Rico and Virgin Islands
+  filter(!state %in% c("Puerto Rico", "Virgin Islands")) %>%
+  
+  # Arrange alphabetically by state name
+  arrange(state)
+
+#readr::write_csv(emissions_cleaned, here::here("data", "emissions_cleaned.csv"))
+
+#emissions_cleaned <- read_csv(here("data", "emissions_cleaned.csv"), show_col_types = FALSE)
+```
+
+# Exploratory data viz
+
+#### Which states are significant contributors to overall emissions?
+```{r}
+#| code-summary: Viz 1
+# exploratory viz 1 -------------------------------------
+emissions_cleaned %>%
+  
+  # sum emissions by state
+  group_by(state) %>%
+  summarize(total_emissions = sum(emissions_tons)) %>%
+  
+  # select top 5 states
+  top_n(5, total_emissions) %>%
+  
+  # plot in descending order
+  ggplot(aes(reorder(state, total_emissions), total_emissions)) +
+  geom_col() +
+  
+  coord_flip() +
+  
+  # label y axis
+  scale_y_continuous(labels = scales::label_comma(scale = 0.001, accuracy = 1, suffix = " Gt"),
+                     limits = c(0, 230000000)) +
+  
+  # add title and subtitle
+  labs(title = "Total Emissions by State",
+       subtitle = "(Top 5)") +
+  
+  # base theme
+  theme_minimal() +
+  
+  # minor theme adjustments
+  theme(
+    
+    # remove axis titles
+    axis.title.x = element_blank(),
+    axis.title.y = element_blank(),
+    
+     # adjust the font and size of the axis text
+    axis.text = element_text(family = "sans",
+                              size = 15),
+    
+    # adjust the font and color of the title
+    plot.title = element_text(family = "sans",
+                              size = 20,
+                              hjust = 0.5),
+    
+    # adjust the font and color of the subtitle
+    plot.subtitle = element_text(family = "sans", 
+                                size = 15, 
+                                hjust = 0.5))
+```
+
+Map Viz
+```{r}
+#| code-summary: Viz 2
+# exploratory viz 2 -------------------------------------
+core = "firebrick"
+accent = "gray20"
+
+emissions_cleaned$abbrv <- state.abb[match(emissions_cleaned$state, state.name)]
+
+emissions_cleaned %>%
+  group_by(state, abbrv) %>%
+  summarise(total_emissions = sum(emissions_tons)) %>%
+  arrange(desc(total_emissions)) %>%
+  mutate(opacity = total_emissions/194228936,
+         est = total_emissions/1000000) %>%
+  
+ggplot() +
+
+  # initiate a plot with a rectangles, shading by relative observations (opacity value) ----
+  geom_rect(aes(xmin = 0, xmax = 1, ymin = 0, ymax = 1, alpha = opacity), 
+            fill = core) +
+  
+  # label with state abbreviation ----
+  geom_text(aes(x = 0.5, y = 0.7, label = abbrv), 
+            size = 8, 
+            family = "sans",
+            color = "black") +
+  
+  # label with observations ----
+  geom_text(aes(x = 0.5, y = 0.3, label = round(est, 0)), 
+            size = 6, 
+            family = "sans",
+            color = "black")  +
+
+  # break rectangle up by state ----
+  geofacet::facet_geo(~state) +
+
+  # make each rectangle the same size ----
+  coord_fixed(ratio = 1) +
+  
+  # add descriptio line as subtitle ----
+  labs(title = "Emissions by State",
+       subtitle = "in Terratonnes (Tt)") +
+  
+  # apply a completely empty theme ----
+  theme_void() +
+  
+  # further customize theme ----
+  theme(
+    
+    # remove headers from faceted plots ----
+    strip.text = element_blank(),
+    
+    # adjust the font and color of the title ----
+    plot.title = element_text(family = "sans",
+                              size = 30, 
+                              hjust = 0.5,  
+                              margin = margin(b = 10)),
+    
+    # adjust the font and color of the title ----
+    plot.subtitle = element_text(family = "sans",
+                                 size = 20, 
+                                 hjust = 0.5,  
+                                 margin = margin(b = 10)),
+    
+    # remove legend ----
+    legend.position = "none"
+  )
+```
+
+#### Within the GHG category, which pollutants are most prominent?
+```{r}
+#| code-summary: Viz 3
+# exploratory viz 3 -------------------------------------
+emissions_cleaned %>%
+  # look at GHG only
+  filter(pollutant_type == "GHG") %>%
+  
+  # sum emissions by pollutant
+  group_by(pollutant) %>%
+  summarize(total_emissions = sum(emissions_tons)) %>%
+  
+  # plot pollutant by total emissions
+  ggplot(aes(pollutant, total_emissions)) +
+  geom_col() +
+  
+  # label y axis
+  scale_y_continuous(labels = scales::label_comma(scale = 0.001, accuracy = 1, suffix = " Gt")) +
+  
+  # add title and subtitle
+  labs(title = "GHG Emissions by Pollutant",
+       subtitle = "(Including CO2)") +
+  
+  # basic theme
+  theme_minimal() +
+  
+  # minor theme adjustments
+  theme(
+    
+    # remove axis titles
+    axis.title.x = element_blank(),
+    axis.title.y = element_blank(),
+    
+    # adjust the font and size of the axis text
+    axis.text = element_text(family = "sans",
+                              size = 15),
+    
+    # adjust the font and color of the title
+    plot.title = element_text(family = "sans",
+                              size = 20,
+                              hjust = 0.5),
+    
+    # adjust the font and color of the subtitle
+    plot.subtitle = element_text(family = "sans", 
+                                size = 15, 
+                                hjust = 0.5))
+```
+
+####  Which sources (by SCC level 2) are those GHG from?
+```{r}
+#| code-summary: Viz 4
+# exploratory viz 4 -------------------------------------
+emissions_cleaned %>%
+  # look at GHG only
+  filter(pollutant_type == "GHG") %>%
+  
+  # remove CO2 to get a better look at the other two (methane and nitrous oxide)
+  filter(!pollutant == "Carbon Dioxide") %>%
+  
+  # sum emissions by pollutant
+  group_by(pollutant, scc_level_2) %>%
+  summarise(total_emissions = sum(emissions_tons)) %>%
+  
+  # plot pollutant by total emissions
+  ggplot(aes(pollutant, total_emissions, fill = scc_level_2)) +
+  geom_col(position = position_dodge()) +
+  
+  # label y axis
+  scale_y_continuous(labels = scales::label_comma(scale = 0.001, accuracy = 1, suffix = " Gt")) +
+  
+  # add title and subtitle
+  labs(title = "GHG Emission Sources by Pollutant",
+       subtitle = "(Excluding CO2)") +
+  
+  # basic theme
+  theme_minimal() +
+  
+  # minor theme adjustments
+  theme(
+    
+    # remove axis titles
+    axis.title.x = element_blank(),
+    axis.title.y = element_blank(),
+    
+    # adjust the font and size of the axis text
+    axis.text = element_text(family = "sans",
+                              size = 15),
+    
+    # adjust the font and color of the title
+    plot.title = element_text(family = "sans",
+                              size = 20,
+                              hjust = 0.8),
+    
+    # adjust the font and color of the subtitle
+    plot.subtitle = element_text(family = "sans", 
+                                size = 15, 
+                                hjust = 0.8))
+
+```
+
+####  Which sources (by SCC level 2) are those from?
+```{r}
+#| code-summary: Viz 5
+# exploratory viz 5 -------------------------------------
+emissions_cleaned %>%
+  # look at GHG only
+  filter(pollutant_type == "GHG") %>%
+  
+  # remove CO2 to get a better look at the other two (methane and nitrous oxide)
+  filter(pollutant == "Carbon Dioxide") %>%
+  
+  # sum emissions by pollutant
+  group_by(pollutant, scc_level_2) %>%
+  summarise(total_emissions = sum(emissions_tons)) %>%
+  
+  # plot pollutant by total emissions
+  ggplot(aes(pollutant, total_emissions, fill = scc_level_2)) +
+  geom_col(position = position_dodge()) +
+  
+  # label y axis
+  scale_y_continuous(labels = scales::label_comma(scale = 0.001, accuracy = 1, suffix = " Gt")) +
+  
+  # add title and subtitle
+  labs(title = "GHG Emission Sources by Pollutant",
+       subtitle = "(CO2)") +
+  
+  # basic theme
+  theme_minimal() +
+  
+  # minor theme adjustments
+  theme(
+    
+    # remove axis titles
+    axis.title.x = element_blank(),
+    axis.title.y = element_blank(),
+    
+    # adjust the font and size of the axis text
+    axis.text = element_text(family = "sans",
+                              size = 15),
+    
+    # adjust the font and color of the title
+    plot.title = element_text(family = "sans",
+                              size = 20,
+                              hjust = 0.5),
+    
+    # adjust the font and color of the subtitle
+    plot.subtitle = element_text(family = "sans", 
+                                size = 15, 
+                                hjust = 0.5))
+```
+
+## 2c. Questions
+
+1. I have learned:
+
+- the majority of emissions (by ton) are attributed to CO2 (a GHG)
+- highway vehicles (gasoline) are the largest contributors of emissions by source, followed by highway vehicles (diesel) and other combustion
+- Texas, California, Florida, Ohio, and Georgia are the top 5 emittors by total emissions
+
+2. I have been able to answer most of my original questions, but there are certainly more questions to be explored. I would be interested in diving into the sources more; perhaps a tree of sources/source levels would be a great next direction.
+
+3. I am running into challenges visualizing this data outside of bar graphs. Many of the answers to my various questions involve displaying one massive value as compared to a couple much smaller values. Therefore, it is difficult to include all variables on the same scale and still highlight differences in the smaller variables. 
+
+
