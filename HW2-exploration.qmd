@@ -25,6 +25,7 @@ library(janitor)
 library(readxl)
 library(tidyverse)
 library(geofacet) 
+library(ggwordcloud)
 ```
 
 # Clean and wrangle data
@@ -262,7 +263,7 @@ emissions_cleaned %>%
   summarise(total_emissions = sum(emissions_tons)) %>%
   
   # plot pollutant by total emissions
-  ggplot(aes(pollutant, total_emissions, fill = scc_level_2)) +
+  ggplot(aes(reorder(pollutant, -total_emissions), total_emissions, fill = scc_level_2)) +
   geom_col(position = position_dodge()) +
   
   # label y axis
@@ -277,6 +278,7 @@ emissions_cleaned %>%
   
   # minor theme adjustments
   theme(
+    panel.grid = element_blank(),
     
     # remove axis titles
     axis.title.x = element_blank(),
@@ -314,7 +316,7 @@ emissions_cleaned %>%
   summarise(total_emissions = sum(emissions_tons)) %>%
   
   # plot pollutant by total emissions
-  ggplot(aes(pollutant, total_emissions, fill = scc_level_2)) +
+  ggplot(aes(reorder(pollutant, -total_emissions), total_emissions, fill = scc_level_2)) +
   geom_col(position = position_dodge()) +
   
   # label y axis
@@ -349,6 +351,18 @@ emissions_cleaned %>%
                                 hjust = 0.5))
 ```
 
+#### Which pollutants are most common by tonnage?
+```{r}
+#| code-summary: Viz 6
+# exploratory viz 6 -------------------------------------
+emissions_cleaned %>%
+  group_by(pollutant) %>%
+  summarise(emissions = sum(emissions_tons)) %>%
+ggplot(aes(label = pollutant, size = emissions)) +
+  geom_text_wordcloud() +
+  theme_minimal()
+```
+
 ## 2c. Questions
 
 1. I have learned:
@@ -359,6 +373,4 @@ emissions_cleaned %>%
 
 2. I have been able to answer most of my original questions, but there are certainly more questions to be explored. I would be interested in diving into the sources more; perhaps a tree of sources/source levels would be a great next direction.
 
-3. I am running into challenges visualizing this data outside of bar graphs. Many of the answers to my various questions involve displaying one massive value as compared to a couple much smaller values. Therefore, it is difficult to include all variables on the same scale and still highlight differences in the smaller variables. 
-
-
+3. I am running into challenges visualizing this data outside of bar graphs. Many of the answers to my various questions involve displaying one massive value as compared to a couple much smaller values. Therefore, it is difficult to include all variables on the same scale and still highlight differences in the smaller variables. I tried to play around with some radial bar graphs but ran into difficulty distinguishing between multiple categories.
