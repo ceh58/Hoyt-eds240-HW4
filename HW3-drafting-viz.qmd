@@ -1,0 +1,345 @@
+---
+title: "HW 3: Drafting Viz"
+author: "Carmen Hoyt"
+date: last-modified
+format:
+  html:
+      embed-resources: true
+      toc: true
+      code-fold: true
+editor: visual
+execute:
+  warning: false
+  messages: false
+editor_options: 
+  chunk_output_type: console
+---
+
+# Description
+
+1. **Which option do you plan to pursue?**
+
+I plan to pursue Option 1. 
+
+2. **Restate your questions:**
+
+*What is the makeup of emissions in the US?*
+
+- 1. What are the major sources of pollution? What sectors do these belong to?
+
+- 2. Which pollutant types are most prominent?
+
+- 3. How do emissions differ by state?
+
+3. **Explain which variables from your data set(s) you will use to answer your question(s), and how.**
+
+To answer my first two questions, I need to group the cleaned dataset by `source_description` and sum `emissions_tons` to achieve total emissions by source. Then, I can investigate the different sectors contributing to air pollution by grouping the dataset by `eis_sector` and summing `emissions_tons`. However, some of these sectors are broken down even further. I am only interested in the overarching sector; so, to consolidate, I will need to assign the overarching sector with a new variable `sector`. Then, I can group by `sector` and sum `emissions_tons` again for a better idea of emissions by sector. 
+
+To answer my second question, I can group the dataset by `pollutant_type` and sum `emissions_tons`. This will give me the breakdown of emissions by GHG, HAP, CAP and CAP/HAP. OR I can group the dataset by `pollutant` and sum `emissions_tons`. This is what I have created in my mockup, but I will have to brainstorm how to represent the very small pollutants. Perhaps I only visualize the top 5.
+
+Finally, I will sum `emissions_tons` by `state`. However, I think this might be more meaningful if I also normalize by state area. If i join my data with the `state.area` data in R, I can divide total emissions by `area` (in square miles) and end up with emissions (tons) per square mile for each state. 
+
+4. **Borrowed visualizations:**
+
+- [Where Do Emissions Come From?](https://cdn.statcdn.com/Infographic/images/normal/33334.jpeg) I really like how the overarching categories ("Energy", "Industrial processes", "Agriculture, etc." and "other) are further broken down and represented with a hue in the circular bar chart. I would like to borrow this framework to visualize the breakdown of `eis_sector` for my dataset (if I keep the subcategories). 
+
+- [Pollutant Infographic](https://shrinkthatfootprint.com/wp-content/uploads/2022/07/Greenhouse-gas-infographic.png.webp) I like how the size of the clouds represents the `pollutant_type` variables. I was thinking of representing "which pollutant types are most prominent" with clouds, so it would be very similar to this but by total emissions (in tons) instead of percentages.
+
+5. **Hand drawn visualizations**
+
+```{r}
+#| eval: true
+#| echo: false
+#| fig-align: "center"
+#| out-width: "100%"
+#| fig-alt: "Hand drawn mock-up for emissions infographic."
+knitr::include_graphics("IMG_2664.jpg")
+```
+
+6. **Mock-up**
+```{r}
+#| code-summary: Expand-code
+# load packages
+library(tidyverse)
+library(here)
+library(ggwordcloud)
+library(geofacet) 
+library(paletteer)
+
+# load data
+emissions_cleaned <- read_csv(here("data", "emissions_cleaned.csv"))
+
+# get colors
+my_colors <- paletteer::paletteer_d("palettetown::gloom")
+```
+
+```{r}
+#| code-summary: Sources
+#| fig-asp: 1
+#| fig-alt: "A bar graph showing 3 emissions sources (non-point, nonroad, and onroad) showing that onraod procudes the most emissions by tons."
+
+# emissions by source (bar chart)
+sources <- emissions_cleaned %>%
+  group_by(source_description) %>%
+  summarise(emissions_tons = sum(emissions_tons))
+
+# bar chart
+ggplot(sources, aes(source_description, emissions_tons)) +
+  
+  # choose "smokestack" esc color
+  geom_col(fill = "#D0D0D0FF") +
+  
+  # label bars with emissions
+  geom_text(aes(label = scales::label_comma(accuracy = 1, suffix = " t")(emissions_tons)),
+            vjust = - 0.5, 
+            colour = "black", 
+            size = 6,
+            family = "sans",
+            face = "bold") +
+  
+  # set base theme
+  theme_void() +
+  
+  # adjust theme
+  theme(
+    
+    # add x axis text back
+    axis.text.x = element_text(family = "sans",
+                               face = "bold",
+                               size = 17,
+                               margin = margin(t = -10,
+                                               b = 10)),
+    
+    # extend plot margin at top
+    plot.margin = margin(t = 20)
+  )
+```
+
+```{r}
+#| code-summary: Sector
+#| fig-alt: "A donut chart showing the breakdown of emissions in tons by sector, with the mobile sector comprising the majority."
+
+# emissions by sector
+sector <- emissions_cleaned %>%
+  group_by(eis_sector) %>%
+  summarise(emissions_tons = sum(emissions_tons)) %>%
+  mutate(sector = case_when(
+    str_detect(eis_sector, "Agriculture") ~ "Agriculture",
+    str_detect(eis_sector, "Biogenics") ~ "Biogenics",
+    str_detect(eis_sector, "Bulk Gasoline") ~ "Bulk Gasoline Terminals",
+    str_detect(eis_sector, "Commercial Cooking") ~ "Commercial Cooking",
+    str_detect(eis_sector, "Dust") ~ "Dust",
+    str_detect(eis_sector, "Fires") ~ "Fires",
+    str_detect(eis_sector, "Fuel Comb") ~ "Fuel Comb",
+    str_detect(eis_sector, "Gas Stations") ~ "Gas Stations",
+    str_detect(eis_sector, "Industrial Processes") ~ "Industrial Processes",
+    str_detect(eis_sector, "Miscellaneous") ~ "Misc",
+    str_detect(eis_sector, "Mobile") ~ "Mobile",
+    str_detect(eis_sector, "Solvent") ~ "Solvent",
+    str_detect(eis_sector, "Waste Disposal") ~ "Waste Disposal"
+  )) %>%
+  group_by(sector) %>%
+  summarise(emissions_tons = sum(emissions_tons))
+
+# donut chart
+ggplot(sector, aes(x = 2, y = emissions_tons, fill = sector)) +
+  geom_bar(stat = "identity", width = 1) +
+  
+  # use polar coordinates
+  coord_polar(theta = "y", start = 0) + 
+  
+  # set base theme
+  theme_void() +  
+  
+  # create hole
+  xlim(0.5, 2.5) +
+  
+  # set legend
+  theme(legend.position = "right") + 
+  labs(fill = "Sector") +
+  
+  # use gloom palette
+  scale_fill_paletteer_d("palettetown::gloom")
+
+# remove mobile sector for further analysis
+sector %>%
+  filter(!sector == "Mobile") %>%
+  
+  # generate new donut chart
+  ggplot(aes(x = 2, y = emissions_tons, fill = sector)) +
+  geom_bar(stat = "identity", width = 1) +
+  
+  # use polar coordinates
+  coord_polar(theta = "y", start = 0) + 
+  
+  # set base theme
+  theme_void() +  
+  
+  # create hole
+  xlim(0.5, 2.5) + 
+  
+  # set legend
+  theme(legend.position = "right") + 
+  labs(fill = "Sector") +
+  
+  # use gloom palette
+  scale_fill_paletteer_d("palettetown::gloom")
+
+# remove mobile and fires
+sector %>%
+  filter(!sector %in% c("Mobile", "Fires")) %>%
+  
+  # generate new donut chart
+  ggplot(aes(x = 2, y = emissions_tons, fill = sector)) +
+  geom_bar(stat = "identity", width = 1) +
+  
+  # use polar coordinates
+  coord_polar(theta = "y", start = 0) + 
+  
+  # set base theme
+  theme_void() + 
+  
+  # create hole
+  xlim(0.5, 2.5) +
+  
+  # set legend
+  theme(legend.position = "right") + 
+  labs(fill = "Sector") +
+  
+  # use gloom palette
+  scale_fill_paletteer_d("palettetown::gloom")
+```
+
+```{r}
+#| code-summary: Pollutant Cloud
+#| fig-asp: 0.4
+#| fig-alt: "A word cloud graph showing the emissions tons by pollutant, with carbon dioxide comprising the majority."
+# emissions by pollutant
+pollutant <- emissions_cleaned %>%
+  group_by(pollutant) %>%
+  summarise(emissions_tons = sum(emissions_tons))
+
+# emissions by pollutant type
+pollutant_type <- emissions_cleaned %>%
+  group_by(pollutant_type) %>%
+  summarise(emissions_tons = sum(emissions_tons))
+
+# cloud plot
+ggplot(pollutant, aes(label = pollutant, size = emissions_tons)) +
+  geom_text_wordcloud() +
+  scale_size_area(max_size = 20) +
+  theme_minimal()
+```
+
+```{r}
+#| code-summary: Map
+#| fig-asp: 1.2
+#| fig-alt: "A map showing emissios in tons per square mile for each state in the US, with New Jersey producing the most."
+
+# Convert built-in state.area to a df
+state_data <- data.frame(
+  state = state.name,
+  abbrv = state.abb,
+  area = state.area
+)
+
+# Merge datasets using left_join
+state <- emissions_cleaned %>%
+  left_join(state_data, by = "state") %>%
+  group_by(state, abbrv, area) %>%
+  summarise(total_emissions = sum(emissions_tons)) %>%
+  mutate(rel_emissions = total_emissions/area) %>%
+  arrange(desc(rel_emissions)) %>%
+  mutate(opacity = rel_emissions/5068.261374)
+
+core = "#F87000FF"
+accent = "gray20"
+
+ggplot(state) +
+
+  # initiate a plot with a rectangles, shading by relative observations (opacity value) ----
+  geom_rect(aes(xmin = 0, xmax = 1, ymin = 0, ymax = 1, alpha = opacity), 
+            fill = core) +
+  
+  # label with state abbreviation ----
+  geom_text(aes(x = 0.5, y = 0.7, label = abbrv), 
+            size = 8, 
+            family = "sans",
+            color = "black") +
+  
+  # label with observations ----
+  geom_text(aes(x = 0.5, y = 0.3, label = round(rel_emissions, 0)), 
+            size = 5, 
+            family = "sans",
+            color = "black")  +
+
+  # break rectangle up by state ----
+  geofacet::facet_geo(~state) +
+
+  # make each rectangle the same size ----
+  coord_fixed(ratio = 1) +
+  
+  # add descriptio line as subtitle ----
+  labs(title = "Emissions by State",
+       subtitle = "Tons per Square Mile",
+       caption = "Data Source: EPA National Emissions Inventory 2020") +
+  
+  # apply a completely empty theme ----
+  theme_void() +
+  
+  # further customize theme ----
+  theme(
+    
+    # remove headers from faceted plots ----
+    strip.text = element_blank(),
+    
+    # adjust the font and color of the title ----
+    plot.title = element_text(family = "sans",
+                              size = 30, 
+                              hjust = 0.5,  
+                              margin = margin(t = 10,
+                                              b = 10)),
+    
+    # adjust the font and color of the title ----
+    plot.subtitle = element_text(family = "sans",
+                                 size = 20, 
+                                 hjust = 0.5,  
+                                 margin = margin(b = 10)),
+    
+    # remove legend ----
+    legend.position = "none",
+    
+    plot.margin = margin(b = 10)
+  )
+```
+
+```{r}
+#| code-summary: Extra
+# emissions by sector and pollutant type
+sector_breakdown <- emissions_cleaned %>%
+  group_by(eis_sector, pollutant_type) %>%
+  summarise(emissions_tons = sum(emissions_tons)) %>%
+  mutate(sector = case_when(
+    str_detect(eis_sector, "Agriculture") ~ "Agriculture",
+    str_detect(eis_sector, "Biogenics") ~ "Biogenics",
+    str_detect(eis_sector, "Bulk Gasoline") ~ "Bulk Gasoline Terminals",
+    str_detect(eis_sector, "Commercial Cooking") ~ "Commercial Cooking",
+    str_detect(eis_sector, "Dust") ~ "Dust",
+    str_detect(eis_sector, "Fires") ~ "Fires",
+    str_detect(eis_sector, "Fuel Comb") ~ "Fuel Comb",
+    str_detect(eis_sector, "Gas Stations") ~ "Gas Stations",
+    str_detect(eis_sector, "Industrial Processes") ~ "Industrial Processes",
+    str_detect(eis_sector, "Miscellaneous") ~ "Misc",
+    str_detect(eis_sector, "Mobile") ~ "Mobile",
+    str_detect(eis_sector, "Solvent") ~ "Solvent",
+    str_detect(eis_sector, "Waste Disposal") ~ "Waste Disposal"
+  )) %>%
+  group_by(sector, pollutant_type) %>%
+  summarise(emissions_tons = sum(emissions_tons))
+ 
+```
+
+
+
+
+
