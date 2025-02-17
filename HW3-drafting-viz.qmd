@@ -27,7 +27,7 @@ I plan to pursue Option 1.
 
 - 1. What are the major sources of pollution? What sectors do these belong to?
 
-- 2. Which pollutant types are most prominent?
+- 2. Which pollutants are most prominent?
 
 - 3. How do emissions differ by state?
 
@@ -65,12 +65,19 @@ library(here)
 library(ggwordcloud)
 library(geofacet) 
 library(paletteer)
+library(showtext)
 
 # load data
 emissions_cleaned <- read_csv(here("data", "emissions_cleaned.csv"))
 
 # get colors
 my_colors <- paletteer::paletteer_d("palettetown::gloom")
+
+showtext_auto()
+
+# import google fonts
+font_add_google(name = "DM Serif Display", family = "dm_serif") # titles
+font_add_google(name = "DM Sans", family = "dm_sans") # text
 ```
 
 ```{r}
@@ -90,23 +97,23 @@ ggplot(sources, aes(source_description, emissions_tons)) +
   geom_col(fill = "#D0D0D0FF") +
   
   # label bars with emissions
-  geom_text(aes(label = scales::label_comma(accuracy = 1, suffix = " t")(emissions_tons)),
+  geom_text(aes(label = scales::label_comma(accuracy = 1, suffix = " tons")(emissions_tons)),
             vjust = - 0.5, 
-            colour = "black", 
             size = 6,
-            family = "sans",
-            face = "bold") +
+            family = "dm_sans",
+            fontface = "bold") +
   
   # set base theme
   theme_void() +
   
   # adjust theme
   theme(
-    
     # add x axis text back
-    axis.text.x = element_text(family = "sans",
+    axis.text.x = element_text(family = "dm_sans",
                                face = "bold",
                                size = 17,
+                               
+                               # move closer to bars
                                margin = margin(t = -10,
                                                b = 10)),
     
@@ -123,6 +130,7 @@ ggplot(sources, aes(source_description, emissions_tons)) +
 sector <- emissions_cleaned %>%
   group_by(eis_sector) %>%
   summarise(emissions_tons = sum(emissions_tons)) %>%
+  # combine subsectors
   mutate(sector = case_when(
     str_detect(eis_sector, "Agriculture") ~ "Agriculture",
     str_detect(eis_sector, "Biogenics") ~ "Biogenics",
@@ -139,10 +147,11 @@ sector <- emissions_cleaned %>%
     str_detect(eis_sector, "Waste Disposal") ~ "Waste Disposal"
   )) %>%
   group_by(sector) %>%
-  summarise(emissions_tons = sum(emissions_tons))
+  summarise(emissions_tons = sum(emissions_tons)) %>%
+  mutate(label = paste0(sector, " (", round((emissions_tons/sum(emissions_tons))*100, 0), " %)"))
 
 # donut chart
-ggplot(sector, aes(x = 2, y = emissions_tons, fill = sector)) +
+ggplot(sector, aes(x = 2, y = emissions_tons, fill = label)) +
   geom_bar(stat = "identity", width = 1) +
   
   # use polar coordinates
@@ -155,7 +164,17 @@ ggplot(sector, aes(x = 2, y = emissions_tons, fill = sector)) +
   xlim(0.5, 2.5) +
   
   # set legend
-  theme(legend.position = "right") + 
+  theme(
+        legend.position = "right",
+        
+        legend.title = element_text(family = "dm_sans",
+                                    size = 15,
+                                    face = "bold"),
+        
+        legend.text = element_text(family = "dm_sans",
+                                   size = 10)
+        
+        ) + 
   labs(fill = "Sector") +
   
   # use gloom palette
@@ -164,9 +183,10 @@ ggplot(sector, aes(x = 2, y = emissions_tons, fill = sector)) +
 # remove mobile sector for further analysis
 sector %>%
   filter(!sector == "Mobile") %>%
+# mutate(label = paste0(sector, " (", round((emissions_tons/sum(emissions_tons))*100, 0), " %)")) %>%
   
   # generate new donut chart
-  ggplot(aes(x = 2, y = emissions_tons, fill = sector)) +
+  ggplot(aes(x = 2, y = emissions_tons, fill = label)) +
   geom_bar(stat = "identity", width = 1) +
   
   # use polar coordinates
@@ -179,7 +199,17 @@ sector %>%
   xlim(0.5, 2.5) + 
   
   # set legend
-  theme(legend.position = "right") + 
+  theme(
+         legend.position = "right",
+        
+        legend.title = element_text(family = "dm_sans",
+                                    size = 15,
+                                    face = "bold"),
+        
+        legend.text = element_text(family = "dm_sans",
+                                   size = 10)
+        
+        ) + 
   labs(fill = "Sector") +
   
   # use gloom palette
@@ -188,9 +218,10 @@ sector %>%
 # remove mobile and fires
 sector %>%
   filter(!sector %in% c("Mobile", "Fires")) %>%
+  #mutate(label = paste0(sector, " (", round((emissions_tons/sum(emissions_tons))*100, 0), " %)")) %>%
   
   # generate new donut chart
-  ggplot(aes(x = 2, y = emissions_tons, fill = sector)) +
+  ggplot(aes(x = 2, y = emissions_tons, fill = label)) +
   geom_bar(stat = "identity", width = 1) +
   
   # use polar coordinates
@@ -203,7 +234,18 @@ sector %>%
   xlim(0.5, 2.5) +
   
   # set legend
-  theme(legend.position = "right") + 
+  theme(
+    
+        legend.position = "right",
+        
+        legend.title = element_text(family = "dm_sans",
+                                    size = 15,
+                                    face = "bold"),
+        
+        legend.text = element_text(family = "dm_sans",
+                                   size = 10)
+  ) + 
+  
   labs(fill = "Sector") +
   
   # use gloom palette
@@ -226,8 +268,8 @@ pollutant_type <- emissions_cleaned %>%
 
 # cloud plot
 ggplot(pollutant, aes(label = pollutant, size = emissions_tons)) +
-  geom_text_wordcloud() +
-  scale_size_area(max_size = 20) +
+  geom_text_wordcloud(family = "dm_serif") +
+  #scale_size_area(max_size = 20) +
   theme_minimal()
 ```
 
@@ -264,13 +306,13 @@ ggplot(state) +
   # label with state abbreviation ----
   geom_text(aes(x = 0.5, y = 0.7, label = abbrv), 
             size = 8, 
-            family = "sans",
+            family = "dm_sans",
             color = "black") +
   
   # label with observations ----
   geom_text(aes(x = 0.5, y = 0.3, label = round(rel_emissions, 0)), 
             size = 5, 
-            family = "sans",
+            family = "dm_sans",
             color = "black")  +
 
   # break rectangle up by state ----
@@ -294,14 +336,15 @@ ggplot(state) +
     strip.text = element_blank(),
     
     # adjust the font and color of the title ----
-    plot.title = element_text(family = "sans",
+    plot.title = element_text(family = "dm_serif",
+                              face = "bold",
                               size = 30, 
                               hjust = 0.5,  
                               margin = margin(t = 10,
                                               b = 10)),
     
     # adjust the font and color of the title ----
-    plot.subtitle = element_text(family = "sans",
+    plot.subtitle = element_text(family = "dm_sans",
                                  size = 20, 
                                  hjust = 0.5,  
                                  margin = margin(b = 10)),
@@ -340,6 +383,6 @@ sector_breakdown <- emissions_cleaned %>%
 ```
 
 
-
+Ultimately, I decided that including subgroups in the donuts charts would be too overwhelming. Perhaps it would be best for me to include percentages to the legend. Additionally, instead of including clouds by size, I decided to make a word cloud of pollutants, representing emissions in tons by text size.
 
 
