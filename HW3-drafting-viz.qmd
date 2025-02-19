@@ -25,17 +25,19 @@ I plan to pursue Option 1.
 
 *What is the makeup of emissions in the US?*
 
-- 1. What are the major sources of pollution? What sectors do these belong to?
+- 1. What are the major sources of pollution? 
 
-- 2. Which pollutants are most prominent?
+- 2. What sectors do these belong to?
 
-- 3. How do emissions differ by state?
+- 3. Which pollutants are most prominent?
+
+- 4. How do emissions differ by state?
 
 3. **Explain which variables from your data set(s) you will use to answer your question(s), and how.**
 
 To answer my first two questions, I need to group the cleaned dataset by `source_description` and sum `emissions_tons` to achieve total emissions by source. Then, I can investigate the different sectors contributing to air pollution by grouping the dataset by `eis_sector` and summing `emissions_tons`. However, some of these sectors are broken down even further. I am only interested in the overarching sector; so, to consolidate, I will need to assign the overarching sector with a new variable `sector`. Then, I can group by `sector` and sum `emissions_tons` again for a better idea of emissions by sector. 
 
-To answer my second question, I can group the dataset by `pollutant_type` and sum `emissions_tons`. This will give me the breakdown of emissions by GHG, HAP, CAP and CAP/HAP. OR I can group the dataset by `pollutant` and sum `emissions_tons`. This is what I have created in my mockup, but I will have to brainstorm how to represent the very small pollutants. Perhaps I only visualize the top 5.
+To answer my third question, I can group the dataset by `pollutant_type` and sum `emissions_tons`. This will give me the breakdown of emissions by GHG, HAP, CAP and CAP/HAP. OR I can group the dataset by `pollutant` and sum `emissions_tons`. This is what I have created in my mockup, but I will have to brainstorm how to represent the very small pollutants. Perhaps I only visualize the top 5 or 10.
 
 Finally, I will sum `emissions_tons` by `state`. However, I think this might be more meaningful if I also normalize by state area. If i join my data with the `state.area` data in R, I can divide total emissions by `area` (in square miles) and end up with emissions (tons) per square mile for each state. 
 
@@ -57,6 +59,7 @@ knitr::include_graphics("IMG_2664.jpg")
 ```
 
 6. **Mock-up**
+
 ```{r}
 #| code-summary: Expand-code
 # load packages
@@ -66,6 +69,7 @@ library(ggwordcloud)
 library(geofacet) 
 library(paletteer)
 library(showtext)
+library(patchwork)
 
 # load data
 emissions_cleaned <- read_csv(here("data", "emissions_cleaned.csv"))
@@ -77,7 +81,11 @@ showtext_auto()
 
 # import google fonts
 font_add_google(name = "DM Serif Display", family = "dm_serif") # titles
+font_add_google(name = "IBM Plex Sans Condensed", family = "ibm_condensed")
+titletext <- "ibm_condensed"
 font_add_google(name = "DM Sans", family = "dm_sans") # text
+font_add_google(name = "IBM Plex Sans", family = "ibm_plex")
+subtext <- "ibm_plex"
 ```
 
 ```{r}
@@ -91,16 +99,16 @@ sources <- emissions_cleaned %>%
   summarise(emissions_tons = sum(emissions_tons))
 
 # bar chart
-ggplot(sources, aes(source_description, emissions_tons)) +
+stack <- ggplot(sources, aes(source_description, emissions_tons)) +
   
   # choose "smokestack" esc color
   geom_col(fill = "#D0D0D0FF") +
   
   # label bars with emissions
-  geom_text(aes(label = scales::label_comma(accuracy = 1, suffix = " tons")(emissions_tons)),
+  geom_text(aes(label = scales::label_comma(accuracy = 1, suffix = " t")(emissions_tons)),
             vjust = - 0.5, 
             size = 6,
-            family = "dm_sans",
+            family = subtext,
             fontface = "bold") +
   
   # set base theme
@@ -109,7 +117,7 @@ ggplot(sources, aes(source_description, emissions_tons)) +
   # adjust theme
   theme(
     # add x axis text back
-    axis.text.x = element_text(family = "dm_sans",
+    axis.text.x = element_text(family = subtext,
                                face = "bold",
                                size = 17,
                                
@@ -120,6 +128,8 @@ ggplot(sources, aes(source_description, emissions_tons)) +
     # extend plot margin at top
     plot.margin = margin(t = 20)
   )
+
+stack
 ```
 
 ```{r}
@@ -167,11 +177,11 @@ ggplot(sector, aes(x = 2, y = emissions_tons, fill = label)) +
   theme(
         legend.position = "right",
         
-        legend.title = element_text(family = "dm_sans",
+        legend.title = element_text(family = subtext,
                                     size = 15,
                                     face = "bold"),
         
-        legend.text = element_text(family = "dm_sans",
+        legend.text = element_text(family = subtext,
                                    size = 10)
         
         ) + 
@@ -183,7 +193,6 @@ ggplot(sector, aes(x = 2, y = emissions_tons, fill = label)) +
 # remove mobile sector for further analysis
 sector %>%
   filter(!sector == "Mobile") %>%
-# mutate(label = paste0(sector, " (", round((emissions_tons/sum(emissions_tons))*100, 0), " %)")) %>%
   
   # generate new donut chart
   ggplot(aes(x = 2, y = emissions_tons, fill = label)) +
@@ -202,11 +211,11 @@ sector %>%
   theme(
          legend.position = "right",
         
-        legend.title = element_text(family = "dm_sans",
+        legend.title = element_text(family = subtext,
                                     size = 15,
                                     face = "bold"),
         
-        legend.text = element_text(family = "dm_sans",
+        legend.text = element_text(family = subtext,
                                    size = 10)
         
         ) + 
@@ -218,7 +227,6 @@ sector %>%
 # remove mobile and fires
 sector %>%
   filter(!sector %in% c("Mobile", "Fires")) %>%
-  #mutate(label = paste0(sector, " (", round((emissions_tons/sum(emissions_tons))*100, 0), " %)")) %>%
   
   # generate new donut chart
   ggplot(aes(x = 2, y = emissions_tons, fill = label)) +
@@ -238,11 +246,11 @@ sector %>%
     
         legend.position = "right",
         
-        legend.title = element_text(family = "dm_sans",
+        legend.title = element_text(family = subtext,
                                     size = 15,
                                     face = "bold"),
         
-        legend.text = element_text(family = "dm_sans",
+        legend.text = element_text(family = subtext,
                                    size = 10)
   ) + 
   
@@ -253,13 +261,76 @@ sector %>%
 ```
 
 ```{r}
+# emissions by sector
+sector_2 <- emissions_cleaned %>%
+  #filter
+  group_by(eis_sector, scc_level_2) %>%
+  summarise(emissions_tons = sum(emissions_tons)) %>%
+  # combine subsectors
+  mutate(sector = case_when(
+    str_detect(eis_sector, "Agriculture") ~ "Agriculture",
+    str_detect(eis_sector, "Biogenics") ~ "Biogenics",
+    str_detect(eis_sector, "Bulk Gasoline") ~ "Bulk Gasoline Terminals",
+    str_detect(eis_sector, "Commercial Cooking") ~ "Commercial Cooking",
+    str_detect(eis_sector, "Dust") ~ "Dust",
+    str_detect(eis_sector, "Fires") ~ "Fires",
+    str_detect(eis_sector, "Fuel Comb") ~ "Fuel Comb",
+    str_detect(eis_sector, "Gas Stations") ~ "Gas Stations",
+    str_detect(eis_sector, "Industrial Processes") ~ "Industrial Processes",
+    str_detect(eis_sector, "Miscellaneous") ~ "Misc",
+    str_detect(eis_sector, "Mobile") ~ "Mobile",
+    str_detect(eis_sector, "Solvent") ~ "Solvent",
+    str_detect(eis_sector, "Waste Disposal") ~ "Waste Disposal"
+  )) %>%
+  filter(sector == "Mobile") %>%
+  group_by(scc_level_2) %>%
+  summarise(emissions_tons = sum(emissions_tons)) %>%
+  mutate(label = paste0(scc_level_2, " (", round((emissions_tons/sum(emissions_tons))*100, 0), " %)"))
+
+# expand mobile sector for further analysis
+  # generate new donut chart
+ ggplot(sector_2, aes(x = 2, y = emissions_tons, fill = label)) +
+  geom_bar(stat = "identity", width = 1) +
+  
+  # use polar coordinates
+  coord_polar(theta = "y", start = 0) + 
+  
+  # set base theme
+  theme_void() +  
+  
+  # create hole
+  xlim(0.5, 2.5) + 
+  
+  # set legend
+  theme(
+         legend.position = "right",
+        
+        legend.title = element_text(family = subtext,
+                                    size = 15,
+                                    face = "bold"),
+        
+        legend.text = element_text(family = subtext,
+                                   size = 10)
+        
+        ) + 
+  labs(fill = "Sector") +
+  
+  # use gloom palette
+  scale_fill_paletteer_d("palettetown::gloom")
+```
+
+I'd like to represent the sector categories by hue, as suggested in my second "borrowed viz". This will take some workshopping.
+
+```{r}
 #| code-summary: Pollutant Cloud
 #| fig-asp: 0.4
 #| fig-alt: "A word cloud graph showing the emissions tons by pollutant, with carbon dioxide comprising the majority."
 # emissions by pollutant
 pollutant <- emissions_cleaned %>%
   group_by(pollutant) %>%
-  summarise(emissions_tons = sum(emissions_tons))
+  summarise(emissions_tons = sum(emissions_tons)) %>%
+  arrange(desc(emissions_tons)) %>%
+  slice(1:10)
 
 # emissions by pollutant type
 pollutant_type <- emissions_cleaned %>%
@@ -267,10 +338,12 @@ pollutant_type <- emissions_cleaned %>%
   summarise(emissions_tons = sum(emissions_tons))
 
 # cloud plot
-ggplot(pollutant, aes(label = pollutant, size = emissions_tons)) +
-  geom_text_wordcloud(family = "dm_serif") +
+cloud <- ggplot(pollutant, aes(label = pollutant, size = emissions_tons)) +
+  geom_text_wordcloud(family = titletext) +
   #scale_size_area(max_size = 20) +
   theme_minimal()
+
+cloud
 ```
 
 ```{r}
@@ -306,13 +379,13 @@ ggplot(state) +
   # label with state abbreviation ----
   geom_text(aes(x = 0.5, y = 0.7, label = abbrv), 
             size = 8, 
-            family = "dm_sans",
+            family = subtext,
             color = "black") +
   
   # label with observations ----
   geom_text(aes(x = 0.5, y = 0.3, label = round(rel_emissions, 0)), 
             size = 5, 
-            family = "dm_sans",
+            family = subtext,
             color = "black")  +
 
   # break rectangle up by state ----
@@ -336,7 +409,7 @@ ggplot(state) +
     strip.text = element_blank(),
     
     # adjust the font and color of the title ----
-    plot.title = element_text(family = "dm_serif",
+    plot.title = element_text(family = titletext,
                               face = "bold",
                               size = 30, 
                               hjust = 0.5,  
@@ -344,7 +417,7 @@ ggplot(state) +
                                               b = 10)),
     
     # adjust the font and color of the title ----
-    plot.subtitle = element_text(family = "dm_sans",
+    plot.subtitle = element_text(family = subtext,
                                  size = 20, 
                                  hjust = 0.5,  
                                  margin = margin(b = 10)),
@@ -382,7 +455,11 @@ sector_breakdown <- emissions_cleaned %>%
  
 ```
 
+## Decision points
 
-Ultimately, I decided that including subgroups in the donuts charts would be too overwhelming. Perhaps it would be best for me to include percentages to the legend. Additionally, instead of including clouds by size, I decided to make a word cloud of pollutants, representing emissions in tons by text size.
+Ultimately, I decided that including subgroups in the donut charts would be too overwhelming. Perhaps I can use the breakdown by `scc_level_2` of the mobile sector (the majority sector) instead.
 
+Additionally, instead of including "cloud" sizes by total emissions, I decided to make a word cloud of pollutants, representing emissions in tons by text size.
+
+Should I normalize emissions by population size instead of state area?
 
