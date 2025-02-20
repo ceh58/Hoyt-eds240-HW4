@@ -430,7 +430,7 @@ ggplot(state) +
 ```
 
 ```{r}
-#| code-summary: Extra
+#| code-summary: Extra code
 # emissions by sector and pollutant type
 sector_breakdown <- emissions_cleaned %>%
   group_by(eis_sector, pollutant_type) %>%
@@ -455,11 +455,11 @@ sector_breakdown <- emissions_cleaned %>%
  
 ```
 
-## Decision points
+7. **Questions:**
 
-Ultimately, I decided that including subgroups in the donut charts would be too overwhelming. Perhaps I can use the breakdown by `scc_level_2` of the mobile sector (the majority sector) instead.
+a. I ran into a few challenges with my visualizations. Ultimately, I decided that including subgroups in the donut charts would be too overwhelming. Perhaps I can use the donut chart that breaks the "Mobile" sector down by `scc_level_2` instead. Additionally, instead of including clouds sized by total emissions, I decided to make a word cloud of pollutants, representing emissions in tons by text size. Something else I was thinking about is normalizing emissions by population size instead of state area; I am not sure if there is a preferred method. 
 
-Additionally, instead of including "cloud" sizes by total emissions, I decided to make a word cloud of pollutants, representing emissions in tons by text size.
+b. I have been using `ggwordcloud` which was not covered in class but was very easy to learn independently. Everything else I have adapted from class!
 
-Should I normalize emissions by population size instead of state area?
+c. I would welcome any feedback on the read-ability of my plots (specifically on the text size, placement, and fonts). I would also be interested to learn if my color palette is working and clear to the audience. I chose it for the orange-blue contrast and hoped that it would be color-blind friendly. 
 
